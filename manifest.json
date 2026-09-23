@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Dynamic Audio MVP",
-  "version": "0.1.0",
-  "description": "Compresses the dynamic range of the current tab audio.",
+  "version": "0.2.0",
+  "description": "Reduces loud music and effects by compressing the dynamic range of the current tab audio.",
   "minimum_chrome_version": "116",
   "permissions": [
     "tabCapture",

@@ -2,7 +2,6 @@ let mediaStream = null;
 let audioContext = null;
 let sourceNode = null;
 let compressorNode = null;
-let makeupGainNode = null;
 let limiterNode = null;
 let currentTabId = null;
 
@@ -27,29 +26,47 @@ async function startProcessing(streamId, tabId) {
 
   sourceNode = audioContext.createMediaStreamSource(mediaStream);
 
-  // Main compressor: reduces the difference between quiet and loud passages.
+  /*
+   * Main compressor.
+   *
+   * Goal:
+   * - Leave quieter dialogue relatively untouched.
+   * - Reduce louder music and sound effects.
+   *
+   * These values are intentionally more aggressive than the first MVP.
+   */
   compressorNode = audioContext.createDynamicsCompressor();
-  compressorNode.threshold.value = -24;
-  compressorNode.knee.value = 20;
-  compressorNode.ratio.value = 6;
+  compressorNode.threshold.value = -28;
+  compressorNode.knee.value = 12;
+  compressorNode.ratio.value = 8;
   compressorNode.attack.value = 0.01;
-  compressorNode.release.value = 0.25;
+  compressorNode.release.value = 0.30;
 
-  // Small makeup gain to recover some perceived loudness after compression.
-  makeupGainNode = audioContext.createGain();
-  makeupGainNode.gain.value = 1.25;
-
-  // Final limiter-like compressor to control peaks after makeup gain.
+  /*
+   * Final peak control.
+   *
+   * This is not a true brick-wall limiter, but a second compressor with
+   * a very high ratio that keeps sudden peaks under better control.
+   */
   limiterNode = audioContext.createDynamicsCompressor();
   limiterNode.threshold.value = -3;
   limiterNode.knee.value = 0;
   limiterNode.ratio.value = 20;
   limiterNode.attack.value = 0.003;
-  limiterNode.release.value = 0.1;
+  limiterNode.release.value = 0.10;
 
+  /*
+   * Important difference from v0.1:
+   *
+   * There is NO makeup gain.
+   *
+   * The first MVP compressed loud sections and then boosted the complete
+   * signal again. That made dialogue louder as well.
+   *
+   * Now the loud sections stay attenuated after compression.
+   */
   sourceNode
     .connect(compressorNode)
-    .connect(makeupGainNode)
     .connect(limiterNode)
     .connect(audioContext.destination);
 
@@ -60,6 +77,7 @@ async function startProcessing(streamId, tabId) {
   if (audioTrack) {
     audioTrack.addEventListener("ended", async () => {
       const endedTabId = currentTabId;
+
       await stopProcessing();
 
       chrome.runtime.sendMessage({
@@ -71,6 +89,7 @@ async function startProcessing(streamId, tabId) {
   }
 
   console.log("Dynamic Audio enabled for tab:", tabId);
+  console.log("Compressor reduction:", compressorNode.reduction, "dB");
 }
 
 async function stopProcessing() {
@@ -84,7 +103,6 @@ async function stopProcessing() {
   try {
     sourceNode?.disconnect();
     compressorNode?.disconnect();
-    makeupGainNode?.disconnect();
     limiterNode?.disconnect();
   } catch {
     // Nodes may already be disconnected.
@@ -92,7 +110,6 @@ async function stopProcessing() {
 
   sourceNode = null;
   compressorNode = null;
-  makeupGainNode = null;
   limiterNode = null;
 
   if (stream) {
@@ -114,7 +131,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "get-state") {
     sendResponse({
       active: mediaStream !== null,
-      tabId: currentTabId
+      tabId: currentTabId,
+      reduction: compressorNode?.reduction ?? 0
     });
     return;
   }

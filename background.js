@@ -88,7 +88,6 @@ chrome.action.onClicked.addListener(async (tab) => {
     if (state.active) {
       await stopProcessing(state.tabId);
 
-      // Clicking the extension again on the same tab toggles it off.
       if (state.tabId === tab.id) {
         return;
       }
