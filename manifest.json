@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Dynamic Audio MVP",
+  "version": "0.1.0",
+  "description": "Compresses the dynamic range of the current tab audio.",
+  "minimum_chrome_version": "116",
+  "permissions": [
+    "tabCapture",
+    "offscreen"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Toggle Dynamic Audio"
+  }
+}
